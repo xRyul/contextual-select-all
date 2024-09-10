@@ -1,0 +1,10 @@
+{
+	"id": "contextual-select-all",
+	"name": "Contextual Select All",
+	"version": "0.0.1",
+	"minAppVersion": "0.15.0",
+	"description": "Contextual Select All. Provides context aware selections via CMD+A",
+	"author": "xRyul",
+	"authorUrl": "https://obsidian.md",
+	"isDesktopOnly": true
+}
