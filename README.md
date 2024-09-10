@@ -9,7 +9,7 @@ Replaces Obsidians defualt CMD+A "Select All" with context aware selections.
 
 ## Features
 
-- Context-aware selection: Intelligently selects content based on where your cursor is positioned.
+- Context-aware selection based on where your cursor is positioned.
 - Support for various Markdown elements:
   - Headings
   - Lists (including nested lists)
@@ -21,9 +21,6 @@ Replaces Obsidians defualt CMD+A "Select All" with context aware selections.
 - Works in both Source mode and Live Preview mode.
 - Incremental selection: Click multiple times to expand the selection.
 
-## How to Use
-
-Install the plugin, and use CMD+A as usual. It automatically replaces official CMD+A shortcut with enhanced one. Press multiple times to cycle and select different elements. 
 
 ## Each press = more content selected. For example:
 
@@ -73,6 +70,10 @@ Paragraphs:
 
 Empty Lines:
 1. Select entire document
+
+## How to Use
+
+Install the plugin, and use CMD+A as usual. It automatically replaces official CMD+A shortcut with enhanced one. Press multiple times to cycle and select different elements. 
 
 
 ## Limitations
