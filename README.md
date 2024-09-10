@@ -1,5 +1,10 @@
 # Contextual Select All for Obsidian
 
+
+
+https://github.com/user-attachments/assets/773af1da-26c4-46d8-9982-041502eabee5
+
+
 Replaces Obsidians defualt CMD+A "Select All" with context aware selections.
 
 ## Features
@@ -10,7 +15,7 @@ Replaces Obsidians defualt CMD+A "Select All" with context aware selections.
   - Lists (including nested lists)
   - Checklists
   - Tables
-  - Code blocks (press 2x to select whole code excluding "```" press 3x to select whole code including "```")
+  - Code blocks (press 2x to select whole code excluding ``` press 3x to select whole code including ```)
   - Blockquotes
   - Paragraphs
 - Works in both Source mode and Live Preview mode.
@@ -71,5 +76,4 @@ Empty Lines:
 
 
 ## Limitations
-
 - Codeblocks. Selecting empty line inside the code blocks will select all-content instead.
