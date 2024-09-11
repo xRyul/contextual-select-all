@@ -1,5 +1,27 @@
 import { Editor, MarkdownView, Plugin, EditorPosition } from 'obsidian';
 
+class SelectionState {
+    clickCount = 0;
+    originalCursor: EditorPosition | null = null;
+    escPressed = false;
+
+    reset(): void {
+        this.clickCount = 0;
+        this.originalCursor = null;
+        this.escPressed = false;
+    }
+}
+
+interface LineInfo {
+    line: string;
+    lineNumber: number;
+}
+
+interface Selector {
+    matches(editor: Editor, lineInfo: LineInfo): boolean;
+    select(editor: Editor, lineInfo: LineInfo, state: SelectionState): void;
+}
+
 export default class ContextualSelectAllPlugin extends Plugin {
     private selectionState: SelectionState;
 
@@ -13,6 +35,8 @@ export default class ContextualSelectAllPlugin extends Plugin {
             this.registerDomEvent(document, 'click', this.handleMouseClick);
 
             // console.log('Contextual Select All plugin loaded');
+            // Add this new event listener
+            document.addEventListener('keydown', this.handleEscKey);
         });
     }
 
@@ -30,7 +54,6 @@ export default class ContextualSelectAllPlugin extends Plugin {
         }
     }
 
-
     async onunload() {
         // console.log('Unloading Contextual Select All plugin');
         this.selectionState.reset();
@@ -39,6 +62,7 @@ export default class ContextualSelectAllPlugin extends Plugin {
         // Remove the global event listeners
             document.removeEventListener('keydown', this.handleGlobalKeydown, true);
             document.removeEventListener('click', this.handleMouseClick);
+            document.removeEventListener('keydown', this.handleEscKey);
         });
     }
 
@@ -48,6 +72,12 @@ export default class ContextualSelectAllPlugin extends Plugin {
 
     private handleContextualSelectAll = (event: KeyboardEvent, view: MarkdownView) => {
         const editor = view.editor;
+    
+        if (this.selectionState.escPressed) {
+            selectAllContent(editor);
+            this.selectionState.reset();
+            return;
+        }
     
         if (!this.selectionState.originalCursor) {
             this.selectionState.originalCursor = editor.getCursor();
@@ -80,27 +110,20 @@ export default class ContextualSelectAllPlugin extends Plugin {
         // If no selector matched, select all content
         selectAllContent(editor);
     };
+
+    private handleEscKey = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+            this.selectionState.escPressed = true;
+            
+            // Remove the cursor
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeView) {
+                activeView.editor.setCursor(activeView.editor.getCursor());
+            }
+        }
+    };
 }
 
-class SelectionState {
-    clickCount = 0;
-    originalCursor: EditorPosition | null = null;
-
-    reset(): void {
-        this.clickCount = 0;
-        this.originalCursor = null;
-    }
-}
-
-interface LineInfo {
-    line: string;
-    lineNumber: number;
-}
-
-interface Selector {
-    matches(editor: Editor, lineInfo: LineInfo): boolean;
-    select(editor: Editor, lineInfo: LineInfo, state: SelectionState): void;
-}
 
 class HeadingSelector implements Selector {
     matches(editor: Editor, lineInfo: LineInfo): boolean {
@@ -167,14 +190,14 @@ class ListSelector implements Selector {
             case 2: // Select entire list (including all nested items)
                 this.selectEntireList(editor, lineNumber);
                 break;
-            case 3: // Select entire document
-                selectAllContent(editor);
-                break;
-            case 4: // Reset to original cursor position
-                if (state.originalCursor) {
-                    editor.setCursor(state.originalCursor);
-                }
-                break;
+            // case 3: // Select entire document
+            //     selectAllContent(editor);
+            //     break;
+            // case 4: // Reset to original cursor position
+            //     if (state.originalCursor) {
+            //         editor.setCursor(state.originalCursor);
+            //     }
+            //     break;
         }
         state.clickCount++;
     }
@@ -245,14 +268,14 @@ class BlockquoteSelector implements Selector {
             case 2: // Select entire blockquote
                 this.selectEntireBlockquote(editor, lineNumber);
                 break;
-            case 3: // Select entire document
-                selectAllContent(editor);
-                break;
-            case 4: // Reset to original cursor position
-                if (state.originalCursor) {
-                    editor.setCursor(state.originalCursor);
-                }
-                break;
+            // case 3: // Select entire document
+            //     selectAllContent(editor);
+            //     break;
+            // case 4: // Reset to original cursor position
+            //     if (state.originalCursor) {
+            //         editor.setCursor(state.originalCursor);
+            //     }
+            //     break;
         }
         state.clickCount++;
     }
@@ -311,14 +334,14 @@ class CodeBlockSelector implements Selector {
             case 2: // Select entire code block including fences
                 this.selectEntireCodeBlock(editor, lineNumber);
                 break;
-            case 3: // Select entire document
-                selectAllContent(editor);
-                break;
-            case 4: // Reset to original cursor position
-                if (state.originalCursor) {
-                    editor.setCursor(state.originalCursor);
-                }
-                break;
+            // case 3: // Select entire document
+            //     selectAllContent(editor);
+            //     break;
+            // case 4: // Reset to original cursor position
+            //     if (state.originalCursor) {
+            //         editor.setCursor(state.originalCursor);
+            //     }
+            //     break;
         }
         state.clickCount++;
     }
@@ -348,35 +371,103 @@ class CodeBlockSelector implements Selector {
     }
 
     private isInCodeBlock(editor: Editor, lineNumber: number): boolean {
-        let startLine = lineNumber;
-        let endLine = lineNumber;
-
-        while (startLine > 0 && !editor.getLine(startLine).startsWith('```')) {
-            startLine--;
-        }
-
-        while (endLine < editor.lineCount() - 1 && !editor.getLine(endLine).startsWith('```')) {
-            endLine++;
-        }
-
-        return startLine !== endLine &&
-            editor.getLine(startLine).startsWith('```') &&
-            editor.getLine(endLine).startsWith('```');
+        const { start, end } = this.findCodeBlockBoundaries(editor, lineNumber);
+        return start !== end;
     }
 
     private findCodeBlockBoundaries(editor: Editor, lineNumber: number): { start: number, end: number } {
+        const isFenceLine = (line: string) => line.trim().startsWith('```');
+        const currentLine = editor.getLine(lineNumber);
+
+        // Check if we're on a fence line
+        if (isFenceLine(currentLine)) {
+            return this.findBoundariesFromFence(editor, lineNumber);
+        }
+
+        // Normal case: cursor is inside the code block
+        return this.findBoundariesFromContent(editor, lineNumber);
+    }
+
+    private findBoundariesFromFence(editor: Editor, lineNumber: number): { start: number, end: number } {
+        const currentLine = editor.getLine(lineNumber).trim();
+        
+        // If it's definitely an opening fence (has more than just ```)
+        if (currentLine.length > 3) {
+            return this.findClosingFence(editor, lineNumber);
+        }
+        
+        // If it's just ```, we need to determine if it's opening or closing
+        const prevLine = lineNumber > 0 ? editor.getLine(lineNumber - 1).trim() : '';
+        const nextLine = lineNumber < editor.lineCount() - 1 ? editor.getLine(lineNumber + 1).trim() : '';
+        
+        // If the previous line is not a code line and the next line is, treat as opening
+        if (!this.isFenceLine(prevLine) && !this.isCodeContent(prevLine) && this.isCodeContent(nextLine)) {
+            return this.findClosingFence(editor, lineNumber);
+        }
+        
+        // Otherwise, treat as closing and search for opening
+        return this.findOpeningFence(editor, lineNumber);
+    }
+
+    private findClosingFence(editor: Editor, start: number): { start: number, end: number } {
+        let end = start;
+        while (end < editor.lineCount() - 1) {
+            end++;
+            if (this.isFenceLine(editor.getLine(end).trim())) {
+                return { start, end };
+            }
+        }
+        return { start, end: start }; // If no closing fence found, treat as single-line block
+    }
+    private findOpeningFence(editor: Editor, end: number): { start: number, end: number } {
+        let start = end;
+        while (start > 0) {
+            start--;
+            if (this.isFenceLine(editor.getLine(start).trim())) {
+                return { start, end };
+            }
+        }
+        return { start: end, end }; // If no opening fence found, treat as single-line block
+    }
+    private isCodeContent(line: string): boolean {
+        return line.length > 0 && !this.isFenceLine(line);
+    }
+    private findBoundariesFromContent(editor: Editor, lineNumber: number): { start: number, end: number } {
         let start = lineNumber;
         let end = lineNumber;
 
-        while (start > 0 && !editor.getLine(start).startsWith('```')) {
+        // Search upward for the opening fence
+        while (start > 0) {
+            if (this.isFenceLine(editor.getLine(start - 1).trim())) {
+                start--;
+                break;
+            }
             start--;
         }
 
-        while (end < editor.lineCount() - 1 && !editor.getLine(end).startsWith('```')) {
+        // Search downward for the closing fence
+        while (end < editor.lineCount() - 1) {
+            if (this.isFenceLine(editor.getLine(end + 1).trim())) {
+                end++;
+                break;
+            }
             end++;
         }
 
         return { start, end };
+    }
+
+    private isOpeningFence(line: string): boolean {
+        return line.startsWith('```') && line.trim().length > 3;
+    }
+
+    // private isClosingFence(editor: Editor, lineNumber: number): boolean {
+    //     const line = editor.getLine(lineNumber).trim();
+    //     return this.isFenceLine(line) && !this.isOpeningFence(editor, lineNumber);
+    // }
+
+    private isFenceLine(line: string): boolean {
+        return line.startsWith('```');
     }
 }
 
@@ -424,14 +515,14 @@ class ChecklistSelector implements Selector {
             case 2: // Select all consecutive checkboxes
                 this.selectConsecutiveCheckboxes(editor, lineNumber);
                 break;
-            case 3: // Select whole document
-                selectAllContent(editor);
-                break;
-            case 4: // Reset to original cursor position
-                if (state.originalCursor) {
-                    editor.setCursor(state.originalCursor);
-                }
-                break;
+            // case 3: // Select whole document
+            //     selectAllContent(editor);
+            //     break;
+            // case 4: // Reset to original cursor position
+            //     if (state.originalCursor) {
+            //         editor.setCursor(state.originalCursor);
+            //     }
+            //     break;
         }
         state.clickCount++;
     }
