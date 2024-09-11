@@ -1,6 +1,6 @@
 {
 	"name": "contextual-select-all",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Contextual Select All. Provides context aware selections via CMD+A",
 	"main": "main.js",
 	"scripts": {
